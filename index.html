@@ -1,0 +1,1728 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Roadster Flip</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Unofficial fan game: launch a roadster up a curling wall ramp, flip it, and land it on cold-gas thrusters.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Michroma&family=Saira:wght@300;400;600&display=swap">
+<style>
+  :root {
+    /* Layout: full-bleed night-arena canvas with the HUD painted in-canvas; menus are dark glass panels centred over the scene */
+    --night: #040507;
+    --panel: rgba(7, 9, 12, 0.84);
+    --line: rgba(214, 226, 234, 0.16);
+    --ink: #eef2f4;
+    --soft: #c9d1d7;
+    --dim: #8b969f;
+    --led: #ff2d2d;
+    --led-soft: rgba(255, 45, 45, 0.34);
+    --ice: #a9ddff;
+    --font-display: "Michroma", "Eurostile", "Bank Gothic", "Arial Black", sans-serif;
+    --font-body: "Saira", "Segoe UI", system-ui, -apple-system, sans-serif;
+    color-scheme: dark;
+  }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; margin: 0; overflow: hidden; overscroll-behavior: none; }
+  body {
+    background: var(--night);
+    color: var(--ink);
+    font-family: var(--font-body);
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: none;
+  }
+  #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; background: var(--night); }
+  #safe {
+    position: fixed; inset: 0; visibility: hidden; pointer-events: none;
+    padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+  }
+
+  #ui {
+    position: fixed; inset: 0; pointer-events: none;
+    display: grid; place-items: center;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-bottom, 0px));
+  }
+  .panel {
+    pointer-events: auto;
+    box-sizing: border-box;
+    width: min(560px, 100%);
+    max-height: 100%;
+    overflow-y: auto;
+    padding: 28px 28px 22px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    user-select: text;
+    -webkit-user-select: text;
+  }
+  .eyebrow {
+    font-family: var(--font-display);
+    font-size: 10px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--dim);
+  }
+  h1 {
+    margin: 10px 0 0;
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-size: clamp(26px, 7.2vw, 42px);
+    line-height: 1.08;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    text-wrap: balance;
+  }
+  .lightbar {
+    height: 3px;
+    margin: 16px 0 18px;
+    border-radius: 2px;
+    background: linear-gradient(90deg, transparent, var(--led) 10%, var(--led) 90%, transparent);
+    box-shadow: 0 0 16px var(--led), 0 0 3px var(--led);
+  }
+  .lede { margin: 0 0 18px; max-width: 58ch; font-size: 16px; line-height: 1.5; color: var(--soft); }
+  .steps { list-style: none; margin: 0 0 22px; padding: 0; display: grid; gap: 10px; }
+  .steps li {
+    display: grid; grid-template-columns: 70px 1fr; gap: 12px; align-items: baseline;
+    font-size: 14.5px; line-height: 1.45; color: var(--soft);
+  }
+  .steps b { font-family: var(--font-display); font-weight: 400; font-size: 10px; letter-spacing: 0.22em; color: var(--ink); }
+  kbd {
+    font-family: var(--font-body); font-size: 12px; color: var(--ink);
+    padding: 0 6px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 3px;
+    background: rgba(255, 255, 255, 0.04); white-space: nowrap;
+  }
+  .btn {
+    width: 100%;
+    padding: 15px 22px;
+    border: 0;
+    border-radius: 2px;
+    background: var(--led);
+    color: #fff;
+    font-family: var(--font-display);
+    font-size: 13px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    cursor: pointer;
+    box-shadow: 0 0 26px var(--led-soft);
+  }
+  .btn:hover { filter: brightness(1.12); }
+  .btn:focus-visible, .icon-btn:focus-visible, .tbtn:focus-visible { outline: 2px solid var(--ice); outline-offset: 3px; }
+  .fine { margin: 14px 0 0; font-size: 12px; line-height: 1.5; color: var(--dim); text-align: center; }
+
+  .score-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  .label { font-family: var(--font-display); font-size: 9.5px; letter-spacing: 0.26em; text-transform: uppercase; color: var(--dim); }
+  .big { font-size: clamp(40px, 11vw, 58px); font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: 0.01em; }
+  .best { text-align: right; font-size: 20px; font-weight: 400; font-variant-numeric: tabular-nums; }
+  .tag {
+    display: inline-block; margin-left: 10px; padding: 3px 7px; vertical-align: middle;
+    font-family: var(--font-display); font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase;
+    color: #fff; background: var(--led); border-radius: 2px;
+  }
+  .note { margin: 14px 0 16px; font-size: 14px; line-height: 1.5; color: var(--soft); }
+  .stats {
+    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px;
+    margin: 0 0 20px; background: var(--line); border: 1px solid var(--line);
+  }
+  .stats div { padding: 10px 12px; background: #0a0c10; min-width: 0; }
+  .stats dt { font-family: var(--font-display); font-size: 8.5px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--dim); }
+  .stats dd { margin: 5px 0 0; font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .stats dd small { font-size: 11px; font-weight: 400; color: var(--dim); margin-left: 3px; }
+  @media (max-width: 480px) {
+    .panel { padding: 22px 18px 18px; }
+    .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .steps li { grid-template-columns: 58px 1fr; }
+  }
+
+  .icon-btn {
+    position: fixed;
+    top: calc(env(safe-area-inset-top, 0px) + 12px);
+    right: calc(env(safe-area-inset-right, 0px) + 14px);
+    width: 40px; height: 40px;
+    display: grid; place-items: center;
+    padding: 0;
+    border: 1px solid var(--line); border-radius: 50%;
+    background: rgba(6, 8, 10, 0.6); color: var(--ink);
+    cursor: pointer;
+  }
+  .icon-btn svg { width: 18px; height: 18px; }
+
+  #touch {
+    position: fixed; left: 0; right: 0; bottom: 0;
+    display: flex; align-items: flex-end; justify-content: space-between; gap: 16px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 18px);
+    pointer-events: none;
+  }
+  .pad { display: flex; gap: 12px; }
+  .tbtn {
+    pointer-events: auto;
+    width: 74px; height: 74px;
+    display: grid; place-items: center;
+    padding: 0;
+    border: 1px solid rgba(214, 226, 234, 0.28); border-radius: 50%;
+    background: rgba(8, 10, 13, 0.55); color: var(--ink);
+    touch-action: none;
+  }
+  .tbtn svg { width: 30px; height: 30px; }
+  .tbtn.on { background: rgba(255, 255, 255, 0.16); border-color: var(--ink); }
+  .tbtn.thrust {
+    width: 98px; height: 98px;
+    border-color: var(--led);
+    font-family: var(--font-display); font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase;
+    box-shadow: 0 0 22px var(--led-soft);
+  }
+  .tbtn.thrust.on { background: var(--led-soft); }
+</style>
+</head>
+<body>
+<canvas id="game" aria-label="Roadster Flip game view"></canvas>
+<div id="safe" aria-hidden="true"></div>
+
+<div id="ui">
+  <section id="title" class="panel" aria-labelledby="title-h">
+    <div class="eyebrow">Night run · Wall ramp · Cold-gas thrusters</div>
+    <h1 id="title-h">Roadster Flip</h1>
+    <div class="lightbar"></div>
+    <p class="lede">Hit the wall ramp flat out, flip off the curl at the top, then burn the thrusters to set it down on all four wheels.</p>
+    <ol class="steps">
+      <li><b>Launch</b><span>Go when the last light turns green. A quick reaction means more speed at the ramp.</span></li>
+      <li><b>Flip</b><span><kbd>←</kbd> <kbd>→</kbd> rotate the car. Every time it passes upside down counts as a flip.</span></li>
+      <li><b>Land</b><span><kbd>Space</kbd> fires the thrusters out of the floor. Get upright and slow the drop below 39 ft/s before the wheels touch.</span></li>
+    </ol>
+    <button class="btn" id="start">Start run</button>
+    <p class="fine">Fly through the light rings for points and a gas refill. Unofficial fan game, not affiliated with Tesla.</p>
+  </section>
+
+  <section id="results" class="panel" aria-labelledby="r-grade" hidden>
+    <div class="eyebrow" id="r-eyebrow">Run complete</div>
+    <h1 id="r-grade">Clean landing</h1>
+    <div class="lightbar"></div>
+    <div class="score-row">
+      <div>
+        <div class="label">Score</div>
+        <div class="big"><span id="r-score">0</span><span class="tag" id="r-new" hidden>New best</span></div>
+      </div>
+      <div class="best">
+        <div class="label">Best</div>
+        <div id="r-best">0</div>
+      </div>
+    </div>
+    <p class="note" id="r-note"></p>
+    <dl class="stats">
+      <div><dt>Reaction</dt><dd id="r-react"></dd></div>
+      <div><dt>Ramp speed</dt><dd id="r-speed"></dd></div>
+      <div><dt>Peak G</dt><dd id="r-g"></dd></div>
+      <div><dt>Max altitude</dt><dd id="r-alt"></dd></div>
+      <div><dt>Airtime</dt><dd id="r-air"></dd></div>
+      <div><dt>Flips</dt><dd id="r-flips"></dd></div>
+      <div><dt>Rings</dt><dd id="r-rings"></dd></div>
+      <div><dt>Touchdown</dt><dd id="r-sink"></dd></div>
+    </dl>
+    <button class="btn" id="again">Run it again</button>
+    <p class="fine"><kbd>Space</kbd> or <kbd>Enter</kbd> restarts</p>
+  </section>
+</div>
+
+<button id="mute" class="icon-btn" aria-label="Mute sound" aria-pressed="false">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor" stroke="none"/>
+    <path id="mute-waves" d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/>
+    <path id="mute-x" d="M16 9.5l5 5M21 9.5l-5 5" hidden/>
+  </svg>
+</button>
+
+<div id="touch" hidden>
+  <div class="pad">
+    <button class="tbtn" id="t-left" aria-label="Rotate backward">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8.5 5.5H4v-4.5"/><path d="M4.4 5.3A9 9 0 1 1 3 12"/></svg>
+    </button>
+    <button class="tbtn" id="t-right" aria-label="Rotate forward">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15.5 5.5H20v-4.5"/><path d="M19.6 5.3A9 9 0 1 0 21 12"/></svg>
+    </button>
+  </div>
+  <button class="tbtn thrust" id="t-thrust" aria-label="Fire thrusters">Thrust</button>
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  // ------------------------------------------------------------------ setup
+  const $ = (id) => document.getElementById(id);
+  const cvs = $('game');
+  const ctx = cvs.getContext('2d');
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const coarse = matchMedia('(pointer: coarse)');
+  const hasLetterSpacing = 'letterSpacing' in ctx;
+  const F_DISPLAY = '"Michroma", "Eurostile", "Arial Black", sans-serif';
+  const F_BODY = '"Saira", "Segoe UI", system-ui, sans-serif';
+
+  let W = 0, H = 0, DPR = 1;
+  let isTouch = coarse.matches;
+  const safe = { t: 0, r: 0, b: 0, l: 0 };
+
+  function resize() {
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    W = window.innerWidth;
+    H = window.innerHeight;
+    cvs.width = Math.round(W * DPR);
+    cvs.height = Math.round(H * DPR);
+    const cs = getComputedStyle($('safe'));
+    safe.t = parseFloat(cs.paddingTop) || 0;
+    safe.r = parseFloat(cs.paddingRight) || 0;
+    safe.b = parseFloat(cs.paddingBottom) || 0;
+    safe.l = parseFloat(cs.paddingLeft) || 0;
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  const fmt = (n) => Math.round(n).toLocaleString('en-US');
+  const normDeg = (rad) => ((((rad * 180) / Math.PI) % 360) + 540) % 360 - 180;
+
+  // ------------------------------------------------------------------ tuning
+  // World units are metres, y up. Ground surface is y = 0; the ramp starts at x = 0.
+  const G = 9.81;
+  const STEP = 1 / 120;
+  const START_X = -85;
+  const RIDE_H = 0.7;                 // car centre above the road surface
+  const WHEEL_X = 1.45, WHEEL_Y = -0.34, WHEEL_R = 0.36;
+  const THRUST = 26;                  // m/s² along the car's roof normal
+  const FUEL_MAX = 3.0;               // seconds of thruster gas
+  const RING_FUEL = 0.7;
+  const SPIN_ACC = 9.5, SPIN_MAX = 5.4, SPIN_DAMP = 0.35;
+  const AIR_DRAG = 0.003;
+  const FT = 3.28084, MPH = 2.23694;
+  const SINK = { butter: 3.5, clean: 7, hard: 12 }; // m/s at touchdown
+  const NOZZLES = [-1.5, 0, 1.5];
+  const GRADES = {
+    butter: { title: 'Butter landing', pop: 'BUTTER', mult: 2 },
+    clean: { title: 'Clean landing', pop: 'CLEAN', mult: 1.5 },
+    hard: { title: 'Hard landing', pop: 'HARD LANDING', mult: 1 },
+  };
+  const FLIP_NAMES = ['NO FLIP', 'FLIP', 'DOUBLE FLIP', 'TRIPLE FLIP', 'QUAD FLIP'];
+  const flipName = (n) => FLIP_NAMES[n] || `${n}× FLIP`;
+
+  // Car side profile, nose pointing +x. Also used as the collision hull.
+  const BODY = [
+    [2.34, -0.2], [2.3, -0.07], [1.95, 0.03], [1.05, 0.21], [0.15, 0.62], [-0.45, 0.63],
+    [-1.35, 0.39], [-2.05, 0.25], [-2.37, 0.17], [-2.39, -0.12], [-2.26, -0.4], [-2.0, -0.5],
+    [2.0, -0.5], [2.27, -0.36],
+  ];
+  const GLASS = [[0.98, 0.235], [0.17, 0.585], [-0.42, 0.595], [-1.18, 0.385], [-0.55, 0.3], [0.45, 0.255]];
+
+  // ------------------------------------------------------------------ ramp
+  // Quarter pipe into a vertical wall that curls back past vertical, like the one at the reveal.
+  const RAMP = (() => {
+    const segs = [{ r: 26, ang: Math.PI / 2 }, { len: 6 }, { r: 11, ang: (28 * Math.PI) / 180 }];
+    const ds = 0.05;
+    const pts = [{ s: 0, x: 0, y: 0, h: 0, k: 0 }];
+    let x = 0, y = 0, h = 0, s = 0;
+    for (const seg of segs) {
+      const len = seg.len ?? seg.r * seg.ang;
+      const k = seg.r ? 1 / seg.r : 0;
+      const n = Math.max(1, Math.round(len / ds));
+      const st = len / n;
+      for (let i = 0; i < n; i++) {
+        const hm = h + (st * k) / 2;
+        x += Math.cos(hm) * st;
+        y += Math.sin(hm) * st;
+        h += st * k;
+        s += st;
+        pts.push({ s, x, y, h, k });
+      }
+    }
+    const lip = pts[pts.length - 1];
+    const maxX = Math.max(...pts.map((p) => p.x));
+    const back = maxX + 2.2;
+    const solid = [];
+    for (let i = 0; i < pts.length; i += 8) solid.push([pts[i].x, pts[i].y]);
+    solid.push([lip.x, lip.y], [back, lip.y], [back, 0]);
+    // Visual edges of the road band: outer edge sits 0.5 m on the car's side, inner 0.9 m into the structure.
+    const outer = [], inner = [], stripe = [];
+    for (let i = 0; i < pts.length; i += 4) {
+      const p = pts[i], nx = Math.sin(p.h), ny = -Math.cos(p.h);
+      outer.push([p.x - nx * 0.5, p.y - ny * 0.5]);
+      inner.push([p.x + nx * 0.9, p.y + ny * 0.9]);
+      stripe.push([p.x + nx * 0.2, p.y + ny * 0.2]);
+    }
+    return { pts, len: s, lip, maxX, back, solid, outer, inner, stripe };
+  })();
+
+  function rampAt(s) {
+    const p = RAMP.pts;
+    if (s <= 0) return p[0];
+    if (s >= RAMP.len) return p[p.length - 1];
+    let lo = 0, hi = p.length - 1;
+    while (hi - lo > 1) {
+      const m = (lo + hi) >> 1;
+      if (p[m].s <= s) lo = m; else hi = m;
+    }
+    const a = p[lo], b = p[hi], t = (s - a.s) / (b.s - a.s || 1);
+    return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, h: a.h + (b.h - a.h) * t, k: b.k };
+  }
+
+  function inRamp(x, y) {
+    if (x < 0 || x > RAMP.back || y < 0 || y > RAMP.lip.y) return false;
+    const P = RAMP.solid;
+    let inside = false;
+    for (let i = 0, j = P.length - 1; i < P.length; j = i++) {
+      const xi = P[i][0], yi = P[i][1], xj = P[j][0], yj = P[j][1];
+      if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+    }
+    return inside;
+  }
+
+  // Static truss geometry behind the ramp surface.
+  const TRUSS = (() => {
+    const segs = [];
+    const surfX = (y) => {
+      for (const p of RAMP.pts) if (p.y >= y) return p.x;
+      return RAMP.lip.x;
+    };
+    const surfY = (x) => {
+      for (const p of RAMP.pts) if (p.x >= x) return p.y;
+      return RAMP.lip.y;
+    };
+    const B = RAMP.back;
+    const levels = [];
+    for (let y = 3.2; y < RAMP.lip.y - 0.5; y += 3.4) levels.push(y);
+    for (const y of levels) segs.push([surfX(y) + 0.9, y, B, y]);
+    for (let x = 4; x < RAMP.maxX - 1; x += 4) segs.push([x, 0, x, surfY(x) - 0.6]);
+    segs.push([B, 0, B, RAMP.lip.y], [B - 1.4, 0, B - 1.4, RAMP.lip.y - 0.4]);
+    for (let i = 0; i < levels.length - 1; i++) segs.push([B - 1.4, levels[i], surfX(levels[i + 1]) + 0.9, levels[i + 1]]);
+    for (let x = 4; x < RAMP.maxX - 5; x += 4) segs.push([x, 0, x + 4, Math.min(surfY(x + 4), surfY(x) + 4) - 0.6]);
+    return segs;
+  })();
+
+  // ------------------------------------------------------------------ audio
+  const audio = {
+    ctx: null, master: null, muted: false, n: null, buf: null,
+    init() {
+      if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      let a;
+      try { a = new AC(); } catch (e) { return; }
+      this.ctx = a;
+      const master = a.createGain();
+      master.gain.value = this.muted ? 0 : 0.55;
+      master.connect(a.destination);
+      this.master = master;
+      const len = a.sampleRate * 2;
+      const buf = a.createBuffer(1, len, a.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+      this.buf = buf;
+      const loop = () => { const s = a.createBufferSource(); s.buffer = buf; s.loop = true; s.start(); return s; };
+      const filt = (type, f, q) => { const n = a.createBiquadFilter(); n.type = type; n.frequency.value = f; n.Q.value = q || 0.7; return n; };
+      const gain = (v) => { const g = a.createGain(); g.gain.value = v; return g; };
+
+      const m1 = a.createOscillator(); m1.type = 'sawtooth';
+      const m2 = a.createOscillator(); m2.type = 'sine';
+      const mf = filt('lowpass', 1600, 3);
+      const g1 = gain(0.5), g2 = gain(0.35), mg = gain(0);
+      m1.connect(g1).connect(mf); m2.connect(g2).connect(mf); mf.connect(mg).connect(master);
+      m1.start(); m2.start();
+
+      const tg = gain(0), rg = gain(0), wg = gain(0);
+      loop().connect(filt('bandpass', 1500, 0.6)).connect(tg).connect(master);
+      loop().connect(filt('lowpass', 220, 0.8)).connect(rg).connect(master);
+      loop().connect(filt('bandpass', 520, 0.5)).connect(wg).connect(master);
+      this.n = { m1, m2, mg, tg, rg, wg };
+    },
+    setMuted(m) {
+      this.muted = m;
+      if (this.master) this.master.gain.setTargetAtTime(m ? 0 : 0.55, this.ctx.currentTime, 0.03);
+    },
+    update(o) {
+      if (!this.n) return;
+      const t = this.ctx.currentTime, n = this.n;
+      n.m1.frequency.setTargetAtTime(45 + o.speed * 7, t, 0.05);
+      n.m2.frequency.setTargetAtTime(240 + o.speed * 32, t, 0.05);
+      n.mg.gain.setTargetAtTime(o.motor * 0.1, t, 0.08);
+      n.tg.gain.setTargetAtTime(o.thrust * 0.2, t, 0.03);
+      n.rg.gain.setTargetAtTime(o.thrust * 0.4, t, 0.03);
+      n.wg.gain.setTargetAtTime(o.wind * 0.09, t, 0.25);
+    },
+    tone(f, dur, opt = {}) {
+      if (!this.ctx) return;
+      const a = this.ctx, t = a.currentTime + (opt.delay || 0);
+      const o = a.createOscillator(), g = a.createGain();
+      o.type = opt.type || 'sine';
+      o.frequency.setValueAtTime(f, t);
+      if (opt.to) o.frequency.exponentialRampToValueAtTime(opt.to, t + dur);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(opt.vol || 0.15, t + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(g).connect(this.master);
+      o.start(t);
+      o.stop(t + dur + 0.05);
+    },
+    hiss(dur, opt = {}) {
+      if (!this.ctx) return;
+      const a = this.ctx, t = a.currentTime + (opt.delay || 0);
+      const s = a.createBufferSource(); s.buffer = this.buf;
+      const f = a.createBiquadFilter(); f.type = opt.type || 'lowpass'; f.frequency.value = opt.freq || 600;
+      const g = a.createGain();
+      g.gain.setValueAtTime(opt.vol || 0.3, t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      s.connect(f).connect(g).connect(this.master);
+      s.start(t, Math.random());
+      s.stop(t + dur + 0.05);
+    },
+  };
+
+  // ------------------------------------------------------------------ state
+  let state = 'title';
+  let time = 0, phaseT = 0;
+  let car, run, cd = null;
+  let rings = [];
+  const particles = [];
+  const popups = [];
+  const keys = { left: false, right: false, thrust: false };
+  let best = 0;
+  let gNow = 1, gDisp = 1, burnout = 0;
+  const cam = { x: 6, y: 20, s: 20, lead: 0, shake: 0 };
+
+  try { best = parseInt(localStorage.getItem('roadster-flip-best') || '0', 10) || 0; } catch (e) { /* storage blocked */ }
+  try { audio.muted = localStorage.getItem('roadster-flip-muted') === '1'; } catch (e) { /* storage blocked */ }
+
+  function freshCar() {
+    return { x: START_X, y: RIDE_H, vx: 0, vy: 0, v: 0, s: 0, a: 0, w: 0, spin: 0, wing: 0, susp: 0, suspV: 0, thrusting: false };
+  }
+  function freshRun() {
+    return {
+      reaction: 0, q: 0, vmax: 36, rampV: 0, lipV: 0, peakG: 1, maxAlt: 0, airStart: 0, airtime: 0,
+      flips: 0, flipsMax: 0, launchA: 0, rings: 0, fuel: FUEL_MAX, sink: 0, grade: '', crashed: false,
+      reason: '', score: 0, graceT: 0, parts: null,
+    };
+  }
+  car = freshCar();
+  run = freshRun();
+
+  // ------------------------------------------------------------------ physics
+  function stepRunway(c, dt, vmax) {
+    const acc = c.v < vmax ? Math.min(14, (vmax - c.v) * 6 + 1.5) : 0;
+    c.v = Math.min(vmax, c.v + acc * dt);
+    c.x += c.v * dt;
+    c.y = RIDE_H; c.a = 0; c.vx = c.v; c.vy = 0;
+    return acc;
+  }
+  function stepRamp(c, dt) {
+    const p = rampAt(c.s);
+    c.v += (-G * Math.sin(p.h) - 0.0015 * c.v * c.v) * dt;
+    c.s += c.v * dt;
+    const q = rampAt(c.s);
+    c.x = q.x - Math.sin(q.h) * RIDE_H;
+    c.y = q.y + Math.cos(q.h) * RIDE_H;
+    c.a = q.h;
+    c.vx = c.v * Math.cos(q.h);
+    c.vy = c.v * Math.sin(q.h);
+    return q;
+  }
+  // The run-up and ramp are deterministic, so the lip speed is known the moment the car launches from the line.
+  function simulateLip(vmax) {
+    const c = { x: START_X, y: 0, v: 0, s: 0, a: 0, vx: 0, vy: 0 };
+    while (c.x < 0) stepRunway(c, STEP, vmax);
+    c.s = c.x;
+    while (c.s < RAMP.len && c.v > 0.3) stepRamp(c, STEP);
+    return c;
+  }
+  const flipIndex = (a) => Math.floor(((a * 180) / Math.PI - 180) / 360);
+
+  function planRings(lip) {
+    let x = lip.x, y = lip.y, vx = lip.vx, vy = lip.vy, t = 0;
+    const path = [];
+    while (y > 6 && t < 14) {
+      path.push([x, y]);
+      const sp = Math.hypot(vx, vy);
+      vx -= AIR_DRAG * vx * sp / 30;
+      vy -= (G + AIR_DRAG * vy * sp) / 30;
+      x += vx / 30; y += vy / 30; t += 1 / 30;
+    }
+    rings = [0.2, 0.46, 0.7].map((f) => {
+      const p = path[Math.floor(f * (path.length - 1))];
+      const ang = rnd(0, Math.PI * 2), d = rnd(5, 9);
+      return { x: Math.min(16, p[0] + Math.cos(ang) * d), y: Math.max(11, p[1] + Math.sin(ang) * d), got: false, t: 0, seed: rnd(0, 6) };
+    });
+  }
+
+  function step(dt) {
+    time += dt;
+    phaseT += dt;
+    switch (state) {
+      case 'countdown': stepCountdown(dt); break;
+      case 'run': {
+        const acc = stepRunway(car, dt, run.vmax);
+        gNow = Math.hypot(1, acc / G);
+        run.peakG = Math.max(run.peakG, gNow);
+        car.spin += (car.v / WHEEL_R) * dt;
+        if (burnout > 0) {
+          burnout -= dt;
+          for (let i = 0; i < 2; i++) {
+            addP({ k: 'smoke', x: car.x - WHEEL_X + rnd(-0.3, 0.3), y: 0.15, vx: rnd(-7, -2), vy: rnd(0.4, 2), r: rnd(0.4, 0.8), grow: 2.4, life: rnd(1, 1.8), drag: 1.2, g: 0.4, a: 0.42 });
+          }
+        }
+        if (car.x >= 0) { car.s = car.x; run.rampV = car.v; state = 'ramp'; }
+        break;
+      }
+      case 'ramp': {
+        const q = stepRamp(car, dt);
+        gNow = (car.v * car.v * q.k + G * Math.cos(q.h)) / G;
+        run.peakG = Math.max(run.peakG, gNow);
+        car.spin += (car.v / WHEEL_R) * dt;
+        if (car.s >= RAMP.len || car.v <= 0.3) launch(q);
+        break;
+      }
+      case 'air': stepAir(dt); break;
+      case 'landed': stepLanded(dt); break;
+      case 'crashed': stepCrashed(dt); break;
+      default: break;
+    }
+    stepParticles(dt);
+    const wingT = state === 'ramp' || state === 'air' ? 1 : 0;
+    car.wing += (wingT - car.wing) * Math.min(1, dt * 5);
+  }
+
+  function launch(q) {
+    state = 'air';
+    phaseT = 0;
+    run.airStart = time;
+    run.launchA = car.a;
+    run.lipV = car.v;
+    run.graceT = 0.4;
+    car.w = car.v * q.k * 0.55;
+  }
+
+  function stepAir(dt) {
+    const turn = (keys.left ? 1 : 0) - (keys.right ? 1 : 0);
+    if (turn) car.w += turn * SPIN_ACC * dt;
+    else car.w *= 1 - SPIN_DAMP * dt;
+    car.w = clamp(car.w, -SPIN_MAX, SPIN_MAX);
+    car.a += car.w * dt;
+
+    let ax = 0, ay = -G;
+    car.thrusting = keys.thrust && run.fuel > 0;
+    if (car.thrusting) {
+      ax += -Math.sin(car.a) * THRUST;
+      ay += Math.cos(car.a) * THRUST;
+      run.fuel = Math.max(0, run.fuel - dt);
+      emitThrust();
+      gNow = THRUST / G;
+    } else {
+      gNow = 0;
+    }
+    const sp = Math.hypot(car.vx, car.vy);
+    ax -= AIR_DRAG * car.vx * sp;
+    ay -= AIR_DRAG * car.vy * sp;
+    car.vx += ax * dt; car.vy += ay * dt;
+    car.x += car.vx * dt; car.y += car.vy * dt;
+    car.spin += (run.lipV / WHEEL_R) * dt * Math.max(0, 1 - phaseT / 4);
+
+    run.airtime = time - run.airStart;
+    run.maxAlt = Math.max(run.maxAlt, car.y - RIDE_H);
+    run.peakG = Math.max(run.peakG, gNow);
+
+    run.flips = Math.abs(flipIndex(car.a) - flipIndex(run.launchA));
+    if (run.flips > run.flipsMax) {
+      run.flipsMax = run.flips;
+      popup(flipName(run.flips), `+${fmt(1000 * run.flips)}`);
+      audio.tone(520 + run.flips * 120, 0.22, { type: 'triangle', to: 900 + run.flips * 160, vol: 0.12 });
+    }
+
+    for (const r of rings) {
+      if (!r.got && Math.hypot(car.x - r.x, car.y - r.y) < 3.9) collectRing(r);
+    }
+    if (run.graceT > 0) run.graceT -= dt;
+    checkContact();
+  }
+
+  function collectRing(r) {
+    r.got = true;
+    r.t = 0;
+    run.rings++;
+    run.fuel = Math.min(FUEL_MAX, run.fuel + RING_FUEL);
+    popup('RING +500', 'Thruster gas topped up');
+    [880, 1320, 1760].forEach((f, i) => audio.tone(f, 0.25, { type: 'sine', vol: 0.1, delay: i * 0.06 }));
+    for (let i = 0; i < 40; i++) {
+      const a = rnd(0, Math.PI * 2), v = rnd(6, 15);
+      addP({ k: 'glow', x: r.x, y: r.y, vx: Math.cos(a) * v * 0.45, vy: Math.sin(a) * v, r: rnd(0.25, 0.5), grow: -0.3, life: rnd(0.4, 0.7), drag: 2.5, g: 0, c: i % 3 ? 'red' : 'white' });
+    }
+  }
+
+  function carPoint(c, px, py) {
+    const ca = Math.cos(c.a), sa = Math.sin(c.a);
+    return [c.x + px * ca - py * sa, c.y + px * sa + py * ca];
+  }
+
+  function checkContact() {
+    const rampOn = run.graceT <= 0;
+    let wheel = false, body = false, ramp = false;
+    for (const sx of [-WHEEL_X, WHEEL_X]) {
+      const [x, y] = carPoint(car, sx, WHEEL_Y);
+      if (y - WHEEL_R <= 0) wheel = true;
+      else if (rampOn && inRamp(x, y - WHEEL_R)) ramp = true;
+    }
+    for (const [px, py] of BODY) {
+      const [x, y] = carPoint(car, px, py);
+      if (y <= 0) body = true;
+      else if (rampOn && inRamp(x, y)) ramp = true;
+    }
+    if (ramp) return crash('Clipped the ramp structure on the way down.');
+    if (!wheel && !body) return;
+    const ang = normDeg(car.a);
+    const sink = Math.max(0, -car.vy);
+    if (wheel && Math.abs(ang) <= 32) {
+      if (sink > SINK.hard) {
+        return crash(`Hit the deck at ${Math.round(sink * FT)} ft/s. Anything over ${Math.round(SINK.hard * FT)} ft/s breaks the car, so burn the thrusters earlier.`);
+      }
+      return touchdown(sink, Math.abs(ang));
+    }
+    crash(Math.abs(ang) > 115 ? 'Landed on the roof. Rotate back to wheels-down before you burn.' : ang > 0 ? 'Tail hit first. Level the nose before touchdown.' : 'Nose hit first. Level out before touchdown.');
+  }
+
+  function scoreParts() {
+    const n = run.flips;
+    return {
+      flips: 500 * n * (n + 1),
+      alt: Math.round(run.maxAlt * FT * 5),
+      air: Math.round(run.airtime * 200),
+      rings: run.rings * 500,
+    };
+  }
+
+  function touchdown(sink, ang) {
+    run.sink = sink;
+    run.grade = sink <= SINK.butter && ang <= 8 ? 'butter' : sink <= SINK.clean && ang <= 18 ? 'clean' : 'hard';
+    const p = scoreParts();
+    run.parts = p;
+    run.score = Math.round((p.flips + p.alt + p.air) * GRADES[run.grade].mult) + p.rings;
+    state = 'landed';
+    phaseT = 0;
+    car.a = (normDeg(car.a) * Math.PI) / 180;
+    car.w = 0; car.vy = 0; car.y = RIDE_H;
+    car.susp = 0; car.suspV = -sink * 0.9;
+    car.thrusting = false;
+    gNow = 1 + sink * 0.45;
+    run.peakG = Math.max(run.peakG, gNow);
+    if (!reduceMotion) cam.shake = Math.min(1, sink / 10);
+    for (const sx of [-WHEEL_X, WHEEL_X]) {
+      for (let i = 0; i < 10; i++) {
+        addP({ k: 'smoke', x: car.x + sx, y: 0.2, vx: rnd(-1, 1) * (3 + sink) + car.vx * 0.3, vy: rnd(0.2, 1.2), r: rnd(0.4, 0.8), grow: 2, life: rnd(0.8, 1.5), drag: 2, g: 0.2, a: 0.3 });
+      }
+    }
+    audio.hiss(0.35, { vol: 0.2 + sink * 0.03, freq: 400 });
+    audio.tone(110, 0.3, { to: 40, vol: 0.25 });
+    const g = GRADES[run.grade];
+    popup(g.pop, `×${g.mult} landing bonus`);
+  }
+
+  function crash(reason) {
+    run.crashed = true;
+    run.reason = reason;
+    run.sink = Math.max(0, -car.vy);
+    const p = scoreParts();
+    run.parts = p;
+    run.score = p.rings;
+    state = 'crashed';
+    phaseT = 0;
+    car.thrusting = false;
+    car.w += rnd(-3, 3);
+    gNow = 1 + run.sink * 0.6;
+    run.peakG = Math.max(run.peakG, gNow);
+    if (!reduceMotion) cam.shake = 1;
+    sparks(car.x, Math.max(0.1, car.y - 0.6), 40, 18);
+    audio.hiss(0.9, { vol: 0.45, freq: 900 });
+    audio.tone(80, 0.6, { to: 30, vol: 0.3 });
+    [310, 470, 690].forEach((f, i) => audio.tone(f, 0.18, { type: 'square', vol: 0.05, delay: i * 0.05 }));
+    popup('WIPEOUT', 'Flips only count if you land on your wheels');
+  }
+
+  function stepLanded(dt) {
+    car.a *= Math.max(0, 1 - dt * 10);
+    car.suspV += (-car.susp * 220 - car.suspV * 16) * dt;
+    car.susp = clamp(car.susp + car.suspV * dt, -0.24, 0.12);
+    const sp = Math.max(0, Math.abs(car.vx) - 7 * dt);
+    car.vx = Math.sign(car.vx) * sp;
+    car.x += car.vx * dt;
+    car.spin += (car.vx / WHEEL_R) * dt;
+    gNow += (1 - gNow) * Math.min(1, dt * 5);
+    if (Math.abs(car.vx) > 3 && Math.random() < 0.3) {
+      addP({ k: 'smoke', x: car.x + rnd(-2, 2), y: 0.1, vx: -car.vx * 0.1, vy: rnd(0.2, 0.6), r: 0.5, grow: 1.5, life: 1, drag: 2, g: 0.2, a: 0.18 });
+    }
+    if (phaseT > 1.9) showResults();
+  }
+
+  function stepCrashed(dt) {
+    car.vy -= G * dt;
+    car.x += car.vx * dt;
+    car.y += car.vy * dt;
+    car.a += car.w * dt;
+    let minY = Infinity, mx = car.x;
+    const pts = BODY.concat([[-WHEEL_X, WHEEL_Y - WHEEL_R], [WHEEL_X, WHEEL_Y - WHEEL_R]]);
+    for (const [px, py] of pts) {
+      const [x, y] = carPoint(car, px, py);
+      if (y < minY) { minY = y; mx = x; }
+    }
+    if (minY < 0) {
+      car.y -= minY;
+      if (car.vy < 0) {
+        const imp = -car.vy;
+        car.vy = imp > 2 ? imp * 0.3 : 0;
+        car.w = car.w * 0.55 - car.vx * 0.08;
+        car.vx *= 0.75;
+        if (imp > 2.5) {
+          sparks(mx, 0.05, Math.min(30, imp * 2), imp);
+          audio.hiss(0.25, { vol: Math.min(0.35, imp * 0.03), freq: 1200 });
+          if (!reduceMotion) cam.shake = Math.max(cam.shake, Math.min(0.8, imp / 15));
+        }
+      }
+      car.w += -(car.x - mx) * 4 * dt;   // gravity tips it over its contact point
+      car.vx *= 1 - 1.6 * dt;
+      car.w *= 1 - 2.2 * dt;
+    }
+    if (inRamp(car.x, car.y)) { car.vx = -Math.abs(car.vx) * 0.4 - 1; car.x -= 0.08; }
+    if (Math.random() < 0.25) {
+      addP({ k: 'dark', x: car.x + rnd(-1, 1), y: car.y + 0.3, vx: rnd(-1, 1), vy: rnd(1, 2.5), r: 0.5, grow: 1.6, life: rnd(1.4, 2.2), drag: 0.8, g: 0.6, a: 0.35 });
+    }
+    if (phaseT > 2.5) showResults();
+  }
+
+  // ------------------------------------------------------------------ countdown
+  function startCountdown() {
+    audio.init();
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    car = freshCar();
+    run = freshRun();
+    rings = [];
+    particles.length = 0;
+    popups.length = 0;
+    keys.left = keys.right = keys.thrust = false;
+    cd = { t: 0, lit: 0, green: false, greenAt: 0, greenT: 2.2 + rnd(0, 0.9), falseT: 0 };
+    state = 'countdown';
+    phaseT = 0;
+    gNow = 1;
+    syncUI();
+  }
+
+  function stepCountdown(dt) {
+    if (cd.falseT > 0) {
+      cd.falseT -= dt;
+      if (cd.falseT <= 0) Object.assign(cd, { t: 0, lit: 0, green: false, greenT: 2.2 + rnd(0, 0.9) });
+      return;
+    }
+    cd.t += dt;
+    const lit = cd.t > 1.75 ? 3 : cd.t > 1.15 ? 2 : cd.t > 0.55 ? 1 : 0;
+    if (lit > cd.lit) { cd.lit = lit; audio.tone(520, 0.14, { type: 'square', vol: 0.06 }); }
+    if (!cd.green && cd.t >= cd.greenT) {
+      cd.green = true;
+      cd.greenAt = cd.t;
+      audio.tone(1040, 0.4, { type: 'square', vol: 0.07 });
+    }
+    if (cd.green && cd.t - cd.greenAt > 2) go(2);
+  }
+
+  function pressGo() {
+    if (state !== 'countdown' || cd.falseT > 0) return;
+    if (!cd.green) {
+      cd.falseT = 1.4;
+      audio.tone(140, 0.45, { type: 'sawtooth', vol: 0.1 });
+      return;
+    }
+    go(cd.t - cd.greenAt);
+  }
+
+  function go(rt) {
+    run.reaction = rt;
+    run.q = clamp((0.55 - rt) / 0.4, 0, 1);
+    run.vmax = 36 + 6 * run.q;
+    planRings(simulateLip(run.vmax));
+    state = 'run';
+    phaseT = 0;
+    burnout = 0.8;
+    popup(run.q > 0.85 ? 'PERFECT LAUNCH' : 'LAUNCH', `Reaction ${rt.toFixed(3)} s`);
+  }
+
+  // ------------------------------------------------------------------ particles
+  function addP(p) {
+    if (particles.length > 1400) return;
+    p.max = p.life;
+    particles.push(p);
+  }
+  function emitThrust() {
+    const ca = Math.cos(car.a), sa = Math.sin(car.a);
+    const nx = -sa, ny = ca;
+    for (const px of NOZZLES) {
+      const bx = car.x + px * ca + 0.5 * sa, by = car.y + px * sa - 0.5 * ca;
+      addP({ k: 'jet', x: bx, y: by, vx: car.vx - nx * 38 + rnd(-2, 2), vy: car.vy - ny * 38 + rnd(-2, 2), r: 0.22, grow: 3.4, life: 0.11, drag: 2, g: 0 });
+      if (Math.random() < 0.55) {
+        addP({ k: 'smoke', x: bx - nx * 0.6, y: by - ny * 0.6, vx: car.vx * 0.35 - nx * 16 + rnd(-3, 3), vy: car.vy * 0.35 - ny * 16 + rnd(-3, 3), r: 0.6, grow: 2.6, life: rnd(1.5, 2.5), drag: 1.6, g: 0.6, a: 0.5 });
+      }
+    }
+  }
+  function sparks(x, y, n, power) {
+    for (let i = 0; i < n; i++) {
+      addP({ k: 'spark', x, y, vx: car.vx * 0.4 + rnd(-1, 1) * power * 0.6, vy: rnd(0.2, 1) * power * 0.7, r: 0.1, grow: 0, life: rnd(0.3, 0.8), drag: 0.6, g: -G });
+    }
+  }
+  function stepParticles(dt) {
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.life -= dt;
+      if (p.life <= 0) { particles[i] = particles[particles.length - 1]; particles.pop(); continue; }
+      const dr = 1 - p.drag * dt;
+      p.vx *= dr; p.vy *= dr;
+      p.vy += p.g * dt;
+      p.x += p.vx * dt; p.y += p.vy * dt;
+      p.r = Math.max(0.02, p.r + p.grow * dt);
+      if ((p.k === 'smoke' || p.k === 'dark') && p.y < p.r * 0.45 && p.vy < 0) {
+        p.vx += Math.sign(p.vx || rnd(-1, 1)) * Math.abs(p.vy) * 0.7;
+        p.vy = 0.4;
+      }
+      if (p.k === 'spark' && p.y < 0) { p.y = 0; p.vy = -p.vy * 0.35; p.vx *= 0.7; }
+    }
+    for (const r of rings) if (r.got) r.t += dt;
+  }
+
+  // Pre-rendered soft sprites
+  function sprite(stops) {
+    const c = document.createElement('canvas');
+    c.width = c.height = 64;
+    const g = c.getContext('2d');
+    const rg = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    stops.forEach(([o, col]) => rg.addColorStop(o, col));
+    g.fillStyle = rg;
+    g.fillRect(0, 0, 64, 64);
+    return c;
+  }
+  const SPR = {
+    smoke: sprite([[0, 'rgba(232,236,239,0.95)'], [0.45, 'rgba(214,220,224,0.5)'], [1, 'rgba(214,220,224,0)']]),
+    dark: sprite([[0, 'rgba(40,42,46,0.9)'], [0.5, 'rgba(30,32,35,0.45)'], [1, 'rgba(30,32,35,0)']]),
+    jet: sprite([[0, 'rgba(255,255,255,1)'], [0.3, 'rgba(170,222,255,0.7)'], [1, 'rgba(90,170,255,0)']]),
+    red: sprite([[0, 'rgba(255,220,220,1)'], [0.3, 'rgba(255,50,50,0.7)'], [1, 'rgba(255,30,30,0)']]),
+    white: sprite([[0, 'rgba(255,255,255,1)'], [0.35, 'rgba(255,255,255,0.45)'], [1, 'rgba(255,255,255,0)']]),
+    warm: sprite([[0, 'rgba(255,248,230,1)'], [0.3, 'rgba(255,236,200,0.35)'], [1, 'rgba(255,230,190,0)']]),
+  };
+
+  // ------------------------------------------------------------------ popups
+  function popup(text, sub) {
+    popups.push({ text, sub, t: 0, life: 1.7 });
+    if (popups.length > 3) popups.shift();
+  }
+
+  // ------------------------------------------------------------------ camera
+  function updateCamera(dt) {
+    let fx = car.x, fy = Math.max(0, car.y), lead = clamp(car.vx * 0.3, -9, 9);
+    if (state === 'title') { fx = 4 + Math.sin(time * 0.12) * 3; fy = 38; lead = 0; }
+    // Keep the ground at 80% height while the car stays below 30% from the top; past that, zoom out to a floor and let the ground drop away.
+    const sFit = Math.min(W / 24, Math.max(H / 80, Math.min((0.8 * H) / 24, (0.5 * H) / (fy + 3))));
+    cam.s += (sFit - cam.s) * Math.min(1, dt * (sFit < cam.s ? 6 : 1.8));
+    cam.lead += (lead - cam.lead) * Math.min(1, dt * 2);
+    const tx = fx + cam.lead;
+    const ty = Math.max((0.3 * H) / cam.s, fy - (0.2 * H) / cam.s);
+    cam.x += (tx - cam.x) * Math.min(1, dt * 6);
+    cam.y += (ty - cam.y) * Math.min(1, dt * 6);
+    cam.shake = Math.max(0, cam.shake - dt * 2.2);
+  }
+
+  // ------------------------------------------------------------------ render helpers
+  let shX = 0, shY = 0;
+  const LX = (X, p) => W / 2 + (X - cam.x) * cam.s * p + shX;
+  const LY = (Y, p) => H / 2 - (Y - cam.y) * cam.s * p + shY;
+  const px = (n) => n / cam.s;
+  const hash = (n) => { const s = Math.sin(n * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
+
+  function worldTransform() {
+    ctx.setTransform(DPR * cam.s, 0, 0, -DPR * cam.s, DPR * (W / 2 - cam.x * cam.s + shX), DPR * (H / 2 + cam.y * cam.s + shY));
+  }
+  function screenTransform() { ctx.setTransform(DPR, 0, 0, DPR, 0, 0); }
+  function poly(points) {
+    ctx.beginPath();
+    ctx.moveTo(points[0][0], points[0][1]);
+    for (let i = 1; i < points.length; i++) ctx.lineTo(points[i][0], points[i][1]);
+    ctx.closePath();
+  }
+  function spacing(v) { if (hasLetterSpacing) ctx.letterSpacing = v; }
+
+  // ------------------------------------------------------------------ background
+  function drawBackground() {
+    screenTransform();
+    const hy = LY(0, 0.015);
+    const sky = ctx.createLinearGradient(0, 0, 0, Math.max(1, hy));
+    sky.addColorStop(0, '#010203');
+    sky.addColorStop(0.75, '#070a0e');
+    sky.addColorStop(1, '#111820');
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, W, Math.max(0, hy) + 1);
+    const gr = ctx.createLinearGradient(0, hy, 0, H);
+    gr.addColorStop(0, '#0b0f13');
+    gr.addColorStop(1, '#040506');
+    ctx.fillStyle = gr;
+    ctx.fillRect(0, hy, W, H - hy);
+
+    // horizon haze
+    const hz = ctx.createLinearGradient(0, hy - 70, 0, hy + 30);
+    hz.addColorStop(0, 'rgba(120,150,180,0)');
+    hz.addColorStop(0.7, 'rgba(120,150,180,0.07)');
+    hz.addColorStop(1, 'rgba(120,150,180,0)');
+    ctx.fillStyle = hz;
+    ctx.fillRect(0, hy - 70, W, 100);
+
+    ctx.globalCompositeOperation = 'lighter';
+
+    // searchlights
+    {
+      const p = 0.2, span = W / (cam.s * p) / 2 + 200;
+      const k0 = Math.floor((cam.x - span) / 110), k1 = Math.ceil((cam.x + span) / 110);
+      for (let k = k0; k <= k1; k++) {
+        const sx = LX(k * 110 + 30, p), sy = LY(0, p);
+        const th = -Math.PI / 2 + 0.42 * Math.sin(time * 0.22 + k * 1.7);
+        const len = H * 1.6, wdt = 0.04;
+        const g = ctx.createLinearGradient(sx, sy, sx + Math.cos(th) * len, sy + Math.sin(th) * len);
+        g.addColorStop(0, 'rgba(190,215,255,0.13)');
+        g.addColorStop(1, 'rgba(190,215,255,0)');
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.moveTo(sx, sy);
+        ctx.lineTo(sx + Math.cos(th - wdt) * len, sy + Math.sin(th - wdt) * len);
+        ctx.lineTo(sx + Math.cos(th + wdt) * len, sy + Math.sin(th + wdt) * len);
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
+
+    // stadium light towers
+    {
+      const p = 0.12, span = W / (cam.s * p) / 2 + 200;
+      const k0 = Math.floor((cam.x - span) / 150), k1 = Math.ceil((cam.x + span) / 150);
+      for (let k = k0; k <= k1; k++) {
+        const X = k * 150 + 40;
+        const bx = LX(X, p), by = LY(0, p), ty = LY(46, p);
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.strokeStyle = 'rgba(40,46,54,0.8)';
+        ctx.lineWidth = Math.max(1, cam.s * p * 0.6);
+        ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(bx, ty); ctx.stroke();
+        ctx.globalCompositeOperation = 'lighter';
+        const r = Math.max(14, cam.s * p * 9);
+        ctx.globalAlpha = 0.75;
+        ctx.drawImage(SPR.warm, bx - r, ty - r * 0.6, r * 2, r * 1.2);
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = 'rgba(255,250,235,0.95)';
+        const lw = cam.s * p * 6;
+        for (let i = 0; i < 4; i++) ctx.fillRect(bx - lw / 2 + (i * lw) / 3.4, ty - 2, Math.max(1.5, lw / 6), Math.max(1.5, lw / 9));
+      }
+    }
+
+    // drone formation
+    {
+      const p = 0.3;
+      for (let i = 0; i < 48; i++) {
+        const col = i % 12, row = Math.floor(i / 12);
+        const X = -40 + col * 5.5 + Math.sin(time * 0.5 + i) * 0.6;
+        const Y = 52 + row * 4.5 + Math.sin(time * 0.7 + i * 0.6) * 0.5 + Math.sin(col * 0.5 + time * 0.3) * 3;
+        const x = LX(X, p), y = LY(Y, p);
+        if (x < -10 || x > W + 10 || y < -10 || y > H + 10) continue;
+        const tw = 0.55 + 0.45 * Math.sin(time * 3 + i * 2.1);
+        ctx.globalAlpha = 0.5 + 0.5 * tw;
+        ctx.drawImage(SPR.white, x - 4, y - 4, 8, 8);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(x - 0.75, y - 0.75, 1.5, 1.5);
+      }
+      ctx.globalAlpha = 1;
+    }
+    ctx.globalCompositeOperation = 'source-over';
+
+    // grandstand with phone lights
+    {
+      const p = 0.5;
+      const xl = cam.x - W / (cam.s * p) / 2 - 10, xr = cam.x + W / (cam.s * p) / 2 + 10;
+      ctx.fillStyle = '#050608';
+      ctx.beginPath();
+      ctx.moveTo(LX(xl, p), LY(0, p));
+      const t0 = Math.floor(xl / 20) * 20;
+      for (let X = t0; X <= xr + 20; X += 20) {
+        const h = 5 + hash(Math.floor(X / 20)) * 1.5;
+        ctx.lineTo(LX(X, p), LY(h, p));
+        ctx.lineTo(LX(X + 20, p), LY(h, p));
+      }
+      ctx.lineTo(LX(xr + 20, p), LY(0, p));
+      ctx.closePath();
+      ctx.fill();
+      for (let X = t0; X <= xr; X += 20) {
+        const tile = Math.floor(X / 20);
+        for (let j = 0; j < 16; j++) {
+          const sd = tile * 31 + j;
+          const dx = X + hash(sd) * 20, dy = 0.7 + hash(sd + 0.5) * 4.2;
+          const tw = 0.5 + 0.5 * Math.sin(time * (1 + hash(sd + 0.2) * 2) + sd);
+          ctx.fillStyle = `rgba(255,244,222,${(0.25 + 0.6 * tw).toFixed(2)})`;
+          const sz = 1.1 + hash(sd + 0.7) * 0.8;
+          ctx.fillRect(LX(dx, p), LY(dy, p), sz, sz);
+        }
+      }
+    }
+
+    // barrier with light strip
+    {
+      const p = 0.8;
+      const y0 = LY(0, p), y1 = LY(1.1, p);
+      ctx.fillStyle = '#08090b';
+      ctx.fillRect(0, y1, W, y0 - y1 + 1);
+      ctx.fillStyle = 'rgba(210,225,235,0.18)';
+      ctx.fillRect(0, y1, W, 1);
+      const xl = cam.x - W / (cam.s * p) / 2, xr = cam.x + W / (cam.s * p) / 2;
+      ctx.fillStyle = 'rgba(235,242,248,0.55)';
+      for (let X = Math.floor(xl / 8) * 8; X <= xr; X += 8) ctx.fillRect(LX(X, p) - 1, y1 - 1, 2, 2);
+    }
+  }
+
+  // ------------------------------------------------------------------ world
+  function drawWorld() {
+    worldTransform();
+    const viewL = cam.x - W / 2 / cam.s - 4, viewR = cam.x + W / 2 / cam.s + 4;
+    const viewB = cam.y - H / 2 / cam.s - 4;
+
+    // ramp truss
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = '#1b1f24';
+    ctx.lineWidth = Math.max(px(1.5), 0.12);
+    ctx.beginPath();
+    for (const s of TRUSS) { ctx.moveTo(s[0], s[1]); ctx.lineTo(s[2], s[3]); }
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(120,135,150,0.16)';
+    ctx.lineWidth = px(1);
+    ctx.stroke();
+
+    // foreground ground and slab face
+    ctx.fillStyle = '#060709';
+    ctx.fillRect(viewL, viewB, viewR - viewL, -0.9 - viewB);
+    ctx.fillStyle = '#101317';
+    ctx.fillRect(viewL, -1.6, viewR - viewL, 0.7);
+    ctx.fillStyle = 'rgba(255,40,40,0.08)';
+    ctx.fillRect(viewL, -1.6, viewR - viewL, 0.25);
+
+    // runway band (road surface)
+    const rg = ctx.createLinearGradient(0, 0.5, 0, -0.9);
+    rg.addColorStop(0, '#202429');
+    rg.addColorStop(1, '#353a40');
+    ctx.fillStyle = rg;
+    ctx.fillRect(viewL, -0.9, viewR - viewL, 1.4);
+    ctx.fillStyle = 'rgba(235,240,244,0.55)';
+    for (let X = Math.floor(viewL / 6) * 6; X < viewR; X += 6) if (X < -4 || X > RAMP.back + 1) ctx.fillRect(X, -0.24, 3, 0.07);
+    if (START_X > viewL && START_X < viewR) {
+      ctx.fillStyle = 'rgba(240,244,247,0.85)';
+      ctx.fillRect(START_X - 0.7, -0.9, 0.5, 1.4);
+    }
+
+    // ramp road band
+    ctx.beginPath();
+    ctx.moveTo(RAMP.outer[0][0], RAMP.outer[0][1]);
+    for (const q of RAMP.outer) ctx.lineTo(q[0], q[1]);
+    for (let i = RAMP.inner.length - 1; i >= 0; i--) ctx.lineTo(RAMP.inner[i][0], RAMP.inner[i][1]);
+    ctx.closePath();
+    const bg = ctx.createLinearGradient(0, 0, 16, 10);
+    bg.addColorStop(0, '#2d3136');
+    bg.addColorStop(1, '#8c9196');
+    ctx.fillStyle = bg;
+    ctx.fill();
+    // lip cap
+    const L = RAMP.lip;
+    ctx.save();
+    ctx.translate(L.x, L.y);
+    ctx.rotate(L.h);
+    ctx.fillStyle = '#c3c8cc';
+    ctx.fillRect(-0.2, -0.95, 0.25, 1.5);
+    ctx.restore();
+    // white stripe up the ramp
+    ctx.strokeStyle = 'rgba(240,244,247,0.7)';
+    ctx.lineWidth = 0.09;
+    ctx.beginPath();
+    ctx.moveTo(RAMP.stripe[0][0], RAMP.stripe[0][1]);
+    for (const q of RAMP.stripe) ctx.lineTo(q[0], q[1]);
+    ctx.stroke();
+
+    // red LED edges along runway and ramp
+    const chase = state === 'run' || state === 'ramp';
+    const edge = (y0, pts) => {
+      ctx.beginPath();
+      ctx.moveTo(viewL, y0);
+      ctx.lineTo(0, y0);
+      for (const q of pts) ctx.lineTo(q[0], q[1]);
+      if (viewR > RAMP.back) { ctx.moveTo(RAMP.back, y0); ctx.lineTo(viewR, y0); }
+    };
+    ctx.globalCompositeOperation = 'lighter';
+    for (const [y0, pts] of [[0.5, RAMP.outer], [-0.9, RAMP.inner]]) {
+      edge(y0, pts);
+      ctx.strokeStyle = 'rgba(255,40,40,0.16)'; ctx.lineWidth = px(10); ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,50,50,0.55)'; ctx.lineWidth = px(3.5); ctx.stroke();
+      ctx.strokeStyle = '#ff5a5a'; ctx.lineWidth = px(1.5); ctx.stroke();
+      if (chase) {
+        ctx.setLineDash([2.5, 7]);
+        ctx.lineDashOffset = -time * 55;
+        ctx.strokeStyle = 'rgba(255,215,215,0.9)'; ctx.lineWidth = px(2.5); ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
+    // aviation lights on the truss
+    const blink = 0.5 + 0.5 * Math.sin(time * 3);
+    ctx.globalAlpha = 0.4 + 0.6 * blink;
+    for (const [x, y] of [[RAMP.back, RAMP.lip.y], [RAMP.back - 1.4, RAMP.lip.y - 0.4]]) ctx.drawImage(SPR.red, x - 0.9, y - 0.9, 1.8, 1.8);
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  function drawRings() {
+    for (const r of rings) {
+      if (r.got && r.t > 0.6) continue;
+      const grow = r.got ? 1 + r.t * 2.2 : 1 + 0.05 * Math.sin(time * 4 + r.seed);
+      const alpha = r.got ? 1 - r.t / 0.6 : 1;
+      ctx.save();
+      ctx.translate(r.x, r.y);
+      ctx.globalAlpha = alpha;
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 1.25 * grow, 3.7 * grow, 0, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(255,40,40,0.22)'; ctx.lineWidth = px(14); ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,60,60,0.7)'; ctx.lineWidth = px(5); ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,236,236,0.95)'; ctx.lineWidth = px(1.8); ctx.stroke();
+      for (let i = 0; i < 10; i++) {
+        const a = (i / 10) * Math.PI * 2 + time * 1.4;
+        const x = Math.cos(a) * 1.25 * grow, y = Math.sin(a) * 3.7 * grow;
+        ctx.drawImage(SPR.white, x - 0.35, y - 0.35, 0.7, 0.7);
+      }
+      ctx.restore();
+    }
+  }
+
+  function drawShadow() {
+    if (state === 'title' || car.x > -1) return;
+    const h = Math.max(0, car.y - RIDE_H);
+    const a = 0.6 * clamp(1 - h / 45, 0, 1);
+    if (a <= 0.01) return;
+    ctx.save();
+    ctx.translate(car.x, 0.02);
+    ctx.scale(2.6 + h * 0.06, 0.28);
+    const g = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
+    g.addColorStop(0, `rgba(0,0,0,${a.toFixed(3)})`);
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(0, 0, 1, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawWheel(x, y, spin) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.fillStyle = '#0b0c0e';
+    ctx.beginPath(); ctx.arc(0, 0, WHEEL_R, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+    ctx.lineWidth = 0.02;
+    ctx.beginPath(); ctx.arc(0, 0, WHEEL_R - 0.03, 0, Math.PI * 2); ctx.stroke();
+    const rim = ctx.createRadialGradient(0, 0, 0.02, 0, 0, 0.27);
+    rim.addColorStop(0, '#2e3338'); rim.addColorStop(1, '#121417');
+    ctx.fillStyle = rim;
+    ctx.beginPath(); ctx.arc(0, 0, 0.27, 0, Math.PI * 2); ctx.fill();
+    ctx.rotate(-spin);
+    ctx.fillStyle = '#b9c0c6';
+    for (let i = 0; i < 7; i++) {
+      ctx.rotate((Math.PI * 2) / 7);
+      ctx.beginPath();
+      ctx.moveTo(0.05, 0.015); ctx.lineTo(0.255, 0.07); ctx.lineTo(0.262, 0.01); ctx.lineTo(0.06, -0.03);
+      ctx.closePath(); ctx.fill();
+    }
+    ctx.fillStyle = '#1d2126';
+    ctx.beginPath(); ctx.arc(0, 0, 0.055, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawCar() {
+    ctx.save();
+    ctx.translate(car.x, car.y);
+    ctx.rotate(car.a);
+
+    drawWheel(-WHEEL_X, WHEEL_Y, car.spin);
+    drawWheel(WHEEL_X, WHEEL_Y, car.spin);
+
+    ctx.translate(0, car.susp);
+
+    // rear wing (deploys on the ramp and in the air)
+    const d = car.wing;
+    if (d > 0.04) {
+      const wy = 0.3 + 0.5 * d;
+      ctx.strokeStyle = '#1a1d21';
+      ctx.lineWidth = 0.06;
+      ctx.beginPath(); ctx.moveTo(-1.62, 0.32); ctx.quadraticCurveTo(-1.7, wy, -1.98, wy); ctx.stroke();
+      ctx.fillStyle = '#e1e6e9';
+      poly([[-1.62, wy - 0.15], [-2.48, wy - 0.1], [-2.55, wy + 0.2], [-1.76, wy + 0.1]]);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.lineWidth = 0.015; ctx.stroke();
+      ctx.fillStyle = '#121519';
+      poly([[-1.66, wy - 0.02], [-2.46, wy + 0.1], [-2.47, wy + 0.04], [-1.68, wy - 0.07]]);
+      ctx.fill();
+    }
+
+    // body
+    poly(BODY);
+    const bg = ctx.createLinearGradient(0, 0.64, 0, -0.5);
+    bg.addColorStop(0, '#f6f8f9');
+    bg.addColorStop(0.35, '#d9dfe2');
+    bg.addColorStop(0.62, '#a9b1b6');
+    bg.addColorStop(1, '#5a6268');
+    ctx.fillStyle = bg;
+    ctx.fill();
+
+    ctx.save();
+    poly(BODY);
+    ctx.clip();
+    ctx.fillStyle = '#060708';
+    for (const sx of [-WHEEL_X, WHEEL_X]) { ctx.beginPath(); ctx.arc(sx, WHEEL_Y, 0.44, 0, Math.PI * 2); ctx.fill(); }
+    ctx.fillStyle = '#16191c';
+    poly([[1.9, -0.5], [1.82, -0.31], [-1.86, -0.31], [-1.96, -0.5]]); ctx.fill();
+    ctx.restore();
+
+    // canopy glass
+    poly(GLASS);
+    const gg = ctx.createLinearGradient(0, 0.6, 0, 0.24);
+    gg.addColorStop(0, '#1b2026');
+    gg.addColorStop(1, '#050607');
+    ctx.fillStyle = gg;
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.28)';
+    ctx.lineWidth = 0.018;
+    ctx.beginPath(); ctx.moveTo(0.82, 0.275); ctx.lineTo(0.22, 0.54); ctx.stroke();
+    ctx.strokeStyle = 'rgba(180,190,200,0.35)';
+    ctx.beginPath(); ctx.moveTo(-0.22, 0.595); ctx.lineTo(-0.3, 0.29); ctx.stroke();
+
+    // quarter intake, character line, door cut
+    ctx.fillStyle = '#16191d';
+    poly([[-0.7, 0.2], [-0.98, -0.18], [-1.3, -0.18], [-1.1, 0.16]]); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+    ctx.lineWidth = 0.012;
+    ctx.beginPath(); ctx.moveTo(2.22, -0.1); ctx.lineTo(-2.3, 0.03); ctx.stroke();
+    ctx.strokeStyle = 'rgba(0,0,0,0.22)';
+    ctx.beginPath(); ctx.moveTo(0.95, 0.19); ctx.lineTo(0.86, -0.3); ctx.moveTo(-0.6, 0.31); ctx.lineTo(-0.63, -0.3); ctx.stroke();
+    // diffuser
+    ctx.fillStyle = '#0d0f11';
+    poly([[-2.26, -0.4], [-2.0, -0.5], [-2.08, -0.57], [-2.33, -0.48]]); ctx.fill();
+    // thruster ports
+    for (const nx of NOZZLES) {
+      ctx.fillStyle = '#0a0b0d';
+      ctx.beginPath(); ctx.ellipse(nx, -0.5, 0.16, 0.04, 0, 0, Math.PI * 2); ctx.fill();
+    }
+
+    // lights
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.lineCap = 'round';
+    const tail = [[-2.15, 0.225], [-2.37, 0.17], [-2.385, 0.02]];
+    const head = [[2.3, -0.07], [1.97, 0.02]];
+    const line = (pts) => { ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]); for (const q of pts.slice(1)) ctx.lineTo(q[0], q[1]); };
+    line(tail);
+    ctx.strokeStyle = 'rgba(255,30,30,0.3)'; ctx.lineWidth = 0.22; ctx.stroke();
+    ctx.strokeStyle = '#ff3b3b'; ctx.lineWidth = 0.05; ctx.stroke();
+    line(head);
+    ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 0.2; ctx.stroke();
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 0.045; ctx.stroke();
+    if (car.thrusting) {
+      for (const nx of NOZZLES) ctx.drawImage(SPR.jet, nx - 0.5, -0.95, 1, 0.9);
+    }
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.restore();
+  }
+
+  function drawParticles() {
+    for (const p of particles) {
+      if (p.k !== 'smoke' && p.k !== 'dark') continue;
+      const fadeIn = Math.min(1, (p.max - p.life) * 8);
+      ctx.globalAlpha = p.a * fadeIn * (p.life / p.max);
+      ctx.drawImage(p.k === 'dark' ? SPR.dark : SPR.smoke, p.x - p.r, p.y - p.r, p.r * 2, p.r * 2);
+    }
+    ctx.globalCompositeOperation = 'lighter';
+    for (const p of particles) {
+      if (p.k === 'jet') {
+        ctx.globalAlpha = 0.55 * (p.life / p.max);
+        ctx.drawImage(SPR.jet, p.x - p.r, p.y - p.r, p.r * 2, p.r * 2);
+      } else if (p.k === 'glow') {
+        ctx.globalAlpha = p.life / p.max;
+        ctx.drawImage(p.c === 'white' ? SPR.white : SPR.red, p.x - p.r, p.y - p.r, p.r * 2, p.r * 2);
+      } else if (p.k === 'spark') {
+        ctx.globalAlpha = Math.min(1, (p.life / p.max) * 1.5);
+        ctx.strokeStyle = '#ffb347';
+        ctx.lineWidth = px(2);
+        ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x - p.vx * 0.03, p.y - p.vy * 0.03); ctx.stroke();
+      }
+    }
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  // ------------------------------------------------------------------ HUD
+  function layout() {
+    const compact = isTouch || W < 640;
+    const r = clamp(Math.min(W, H) * 0.075, 36, 56);
+    const gy = compact ? safe.t + 86 + r : H - safe.b - 22 - r;
+    return {
+      compact, r, gy,
+      gxL: safe.l + 20 + r,
+      gxR: W - safe.r - 20 - r,
+      topY: safe.t + 18,
+      centerY: compact ? safe.t + 84 : safe.t + 22,
+      lightsY: compact ? H * 0.4 : H * 0.3,
+      popY: compact ? H * 0.42 : H * 0.34,
+    };
+  }
+
+  function text(str, x, y, font, color, align = 'center', ls = '0px') {
+    ctx.font = font;
+    ctx.fillStyle = color;
+    ctx.textAlign = align;
+    spacing(ls);
+    ctx.fillText(str, x, y);
+    spacing('0px');
+  }
+
+  function gauge(cx, cy, r, label, value, unit, frac, warn) {
+    ctx.fillStyle = 'rgba(4,5,7,0.55)';
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = 'rgba(236,241,244,0.6)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
+    const a0 = Math.PI * 0.75, sweep = Math.PI * 1.5;
+    ctx.strokeStyle = 'rgba(236,241,244,0.3)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let i = 0; i <= 20; i++) {
+      const a = a0 + (sweep * i) / 20, r1 = r - 5, r2 = r - (i % 5 === 0 ? 11 : 8);
+      ctx.moveTo(cx + Math.cos(a) * r1, cy + Math.sin(a) * r1);
+      ctx.lineTo(cx + Math.cos(a) * r2, cy + Math.sin(a) * r2);
+    }
+    ctx.stroke();
+    ctx.strokeStyle = warn ? '#ff3b3b' : '#eef2f4';
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(cx, cy, r - 5, a0, a0 + sweep * clamp(frac, 0.001, 1)); ctx.stroke();
+    text(label, cx, cy - r * 0.3, `${Math.round(r * 0.15)}px ${F_DISPLAY}`, 'rgba(236,241,244,0.78)', 'center', '1px');
+    text(value, cx, cy + r * 0.2, `600 ${Math.round(r * 0.5)}px ${F_BODY}`, warn ? '#ff5050' : '#ffffff');
+    text(unit, cx, cy + r * 0.52, `${Math.round(r * 0.15)}px ${F_DISPLAY}`, 'rgba(236,241,244,0.7)', 'center', '1px');
+  }
+
+  function drawHUD(dt) {
+    screenTransform();
+    const lay = layout();
+    const playing = state !== 'title';
+    const alt = Math.max(0, car.y - RIDE_H);
+
+    if (playing) {
+      const sinkDanger = isSinkDanger();
+      gauge(lay.gxL, lay.gy, lay.r, 'G-FORCE', gDisp.toFixed(1), 'G', gDisp / 10, gDisp > 7.5);
+      gauge(lay.gxR, lay.gy, lay.r, 'ALTITUDE', fmt(alt * FT), 'FT', alt / 75, sinkDanger);
+      if (state === 'air' && car.vy < -1) {
+        const sinkFt = -car.vy * FT;
+        text(`SINK ${Math.round(sinkFt)} FT/S`, lay.gxR, lay.gy + lay.r + 16, `9px ${F_DISPLAY}`, sinkFt > SINK.hard * FT ? '#ff5050' : 'rgba(236,241,244,0.75)', 'center', '1px');
+      }
+    }
+
+    // score block, top left
+    const live = state === 'air' || state === 'run' || state === 'ramp' ? (() => { const p = scoreParts(); return p.flips + p.alt + p.air + p.rings; })() : (state === 'landed' || state === 'crashed' || state === 'results') ? run.score : 0;
+    if (playing) {
+      text('SCORE', safe.l + 20, lay.topY + 10, `9px ${F_DISPLAY}`, 'rgba(236,241,244,0.6)', 'left', '2px');
+      text(fmt(live), safe.l + 20, lay.topY + 36, `600 26px ${F_BODY}`, '#ffffff', 'left');
+      text(`BEST ${fmt(best)}`, safe.l + 20, lay.topY + 54, `9px ${F_DISPLAY}`, 'rgba(236,241,244,0.5)', 'left', '1px');
+    }
+
+    // centre block: speed, gas, flips
+    if (state === 'run' || state === 'ramp' || state === 'air' || state === 'landed' || state === 'crashed') {
+      const cx = W / 2, y = lay.centerY;
+      const speed = Math.hypot(car.vx, car.vy) * MPH;
+      text(String(Math.round(speed)), cx - 4, y + 22, `600 28px ${F_BODY}`, '#ffffff', 'right');
+      text('MPH', cx + 2, y + 22, `9px ${F_DISPLAY}`, 'rgba(236,241,244,0.6)', 'left', '1px');
+      const bw = Math.min(170, W * 0.36), bx = cx - bw / 2, by = y + 34;
+      const f = run.fuel / FUEL_MAX;
+      ctx.fillStyle = 'rgba(236,241,244,0.14)';
+      ctx.fillRect(bx, by, bw, 4);
+      ctx.fillStyle = f < 0.25 ? '#ff4040' : '#a9ddff';
+      ctx.fillRect(bx, by, bw * f, 4);
+      text('THRUSTER GAS', cx, by + 17, `8px ${F_DISPLAY}`, 'rgba(236,241,244,0.55)', 'center', '2px');
+      if (state === 'air' || state === 'landed' || state === 'crashed') {
+        text(`FLIPS ${run.flips}   ·   RINGS ${run.rings}/${rings.length}`, cx, by + 34, `10px ${F_DISPLAY}`, 'rgba(236,241,244,0.85)', 'center', '1px');
+      }
+    }
+
+    if (state === 'countdown') drawLights(lay);
+    if (state === 'air' || state === 'ramp') drawRingPointers();
+    drawWarnings(lay);
+    drawPopups(lay, dt);
+
+    if (state === 'air' && !lay.compact && phaseT < 5) {
+      ctx.globalAlpha = clamp(5 - phaseT, 0, 1);
+      text('←  →  ROTATE      SPACE  THRUSTERS', W / 2, H - safe.b - 28, `10px ${F_DISPLAY}`, 'rgba(236,241,244,0.7)', 'center', '2px');
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  function isSinkDanger() {
+    if (state !== 'air' || car.vy > -SINK.hard) return false;
+    const stop = (car.vy * car.vy) / (2 * (THRUST - G));
+    return car.y - RIDE_H < stop * 1.35 + 4;
+  }
+
+  function drawWarnings(lay) {
+    if (state !== 'air') return;
+    const alt = car.y - RIDE_H;
+    const ang = Math.abs(normDeg(car.a));
+    let msg = null, sub = null;
+    if (isSinkDanger()) {
+      msg = 'SINK RATE';
+      sub = ang > 40 ? 'Rotate wheels-down, then burn' : run.fuel > 0 ? 'Hold thrust' : 'Out of gas';
+    } else if (alt < 14 && car.vy < 0 && ang > 32) {
+      msg = 'WHEELS DOWN';
+      sub = 'Level the car before touchdown';
+    }
+    if (!msg) return;
+    const on = reduceMotion || Math.sin(time * 14) > -0.2;
+    const y = lay.compact ? H * 0.6 : H * 0.62;
+    if (on) text(msg, W / 2, y, `${lay.compact ? 18 : 22}px ${F_DISPLAY}`, '#ff3b3b', 'center', '3px');
+    text(sub, W / 2, y + 24, `400 15px ${F_BODY}`, 'rgba(255,220,220,0.9)');
+  }
+
+  function drawLights(lay) {
+    const gap = 46, rr = 14, cx = W / 2, cy = lay.lightsY;
+    ctx.fillStyle = 'rgba(4,5,7,0.7)';
+    ctx.strokeStyle = 'rgba(236,241,244,0.18)';
+    ctx.lineWidth = 1;
+    const bw = gap * 4 + 8, bh = rr * 2 + 20;
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(cx - bw / 2, cy - bh / 2, bw, bh, bh / 2); else ctx.rect(cx - bw / 2, cy - bh / 2, bw, bh);
+    ctx.fill(); ctx.stroke();
+    const fs = cd.falseT > 0;
+    for (let i = 0; i < 4; i++) {
+      const x = cx + (i - 1.5) * gap;
+      let col = null;
+      if (fs) col = Math.sin(time * 18) > 0 ? '#ff2d2d' : null;
+      else if (i < 3 && cd.lit > i && !cd.green) col = '#ff2d2d';
+      else if (i === 3 && cd.green) col = '#3dff8b';
+      ctx.beginPath(); ctx.arc(x, cy, rr, 0, Math.PI * 2);
+      ctx.fillStyle = col || '#15181c';
+      if (col) { ctx.shadowColor = col; ctx.shadowBlur = 22; }
+      ctx.fill();
+      ctx.shadowBlur = 0;
+    }
+    const msg = fs ? 'FALSE START' : cd.green ? 'GO' : isTouch ? 'TAP ON GREEN' : 'PRESS SPACE ON GREEN';
+    text(msg, cx, cy + bh / 2 + 26, `12px ${F_DISPLAY}`, fs ? '#ff4d4d' : cd.green ? '#3dff8b' : 'rgba(236,241,244,0.85)', 'center', '3px');
+    if (fs) text('Wait for green. Restarting the lights.', cx, cy + bh / 2 + 48, `400 14px ${F_BODY}`, 'rgba(236,241,244,0.7)');
+  }
+
+  function drawRingPointers() {
+    for (const r of rings) {
+      if (r.got) continue;
+      const sx = W / 2 + (r.x - cam.x) * cam.s + shX;
+      const sy = H / 2 - (r.y - cam.y) * cam.s + shY;
+      const m = 26;
+      if (sx > m && sx < W - m && sy > m && sy < H - m) continue;
+      const x = clamp(sx, m, W - m), y = clamp(sy, m + safe.t, H - m - safe.b);
+      const a = Math.atan2(sy - y, sx - x);
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(a);
+      ctx.fillStyle = 'rgba(255,60,60,0.85)';
+      ctx.beginPath(); ctx.moveTo(9, 0); ctx.lineTo(-5, -6); ctx.lineTo(-5, 6); ctx.closePath(); ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  function drawPopups(lay, dt) {
+    let y = lay.popY;
+    for (let i = popups.length - 1; i >= 0; i--) {
+      const p = popups[i];
+      p.t += dt;
+      if (p.t > p.life) { popups.splice(i, 1); continue; }
+    }
+    for (let i = popups.length - 1; i >= 0; i--) {
+      const p = popups[i];
+      const k = p.t / p.life;
+      const pop = reduceMotion ? 1 : 1 + Math.max(0, 0.25 - p.t) * 1.2;
+      ctx.globalAlpha = k < 0.75 ? 1 : 1 - (k - 0.75) / 0.25;
+      const size = Math.round((lay.compact ? 20 : 26) * pop);
+      text(p.text, W / 2, y, `${size}px ${F_DISPLAY}`, '#ffffff', 'center', '3px');
+      if (p.sub) text(p.sub, W / 2, y + 22, `400 15px ${F_BODY}`, 'rgba(236,241,244,0.8)');
+      ctx.globalAlpha = 1;
+      y += 56;
+    }
+  }
+
+  // ------------------------------------------------------------------ results / UI
+  function syncUI() {
+    $('title').hidden = state !== 'title';
+    $('results').hidden = state !== 'results';
+    const playing = state === 'countdown' || state === 'run' || state === 'ramp' || state === 'air' || state === 'landed' || state === 'crashed';
+    $('touch').hidden = !(isTouch && playing);
+  }
+
+  function showResults() {
+    state = 'results';
+    const p = run.parts || scoreParts();
+    const prevBest = best;
+    if (run.score > best) {
+      best = run.score;
+      try { localStorage.setItem('roadster-flip-best', String(best)); } catch (e) { /* storage blocked */ }
+    }
+    $('r-eyebrow').textContent = run.crashed ? 'Crashed' : run.flips ? flipName(run.flips).toLowerCase() : 'No flip';
+    $('r-grade').textContent = run.crashed ? 'Wipeout' : GRADES[run.grade].title;
+    $('r-new').hidden = !(run.score > prevBest && run.score > 0);
+    $('r-best').textContent = fmt(best);
+    if (run.crashed) {
+      $('r-note').textContent = `${run.reason} Flips, altitude and airtime only score when you land it. Rings: ${fmt(p.rings)}.`;
+    } else {
+      const g = GRADES[run.grade];
+      $('r-note').textContent = `Flips ${fmt(p.flips)} + altitude ${fmt(p.alt)} + airtime ${fmt(p.air)}, ×${g.mult} ${run.grade} landing, + rings ${fmt(p.rings)}.`;
+    }
+    const unit = (v, u) => `${v}<small>${u}</small>`;
+    $('r-react').innerHTML = unit(run.reaction.toFixed(3), 's');
+    $('r-speed').innerHTML = unit(Math.round(run.rampV * MPH), 'mph');
+    $('r-g').innerHTML = unit(run.peakG.toFixed(1), 'G');
+    $('r-alt').innerHTML = unit(fmt(run.maxAlt * FT), 'ft');
+    $('r-air').innerHTML = unit(run.airtime.toFixed(1), 's');
+    $('r-flips').textContent = String(run.flips);
+    $('r-rings').textContent = `${run.rings} / ${rings.length}`;
+    $('r-sink').innerHTML = unit(Math.round(run.sink * FT), 'ft/s');
+    countUp($('r-score'), run.score);
+    syncUI();
+  }
+
+  function countUp(el, target) {
+    if (reduceMotion || target === 0) { el.textContent = fmt(target); return; }
+    const t0 = performance.now();
+    const tick = (now) => {
+      const k = Math.min(1, (now - t0) / 800);
+      el.textContent = fmt(target * (1 - Math.pow(1 - k, 3)));
+      if (k < 1 && state === 'results') requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }
+
+  // ------------------------------------------------------------------ input
+  const KEYMAP = { ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right', Space: 'thrust', ArrowUp: 'thrust', KeyW: 'thrust' };
+  window.addEventListener('keydown', (e) => {
+    const onButton = e.target && e.target.closest && e.target.closest('button');
+    if (onButton && (e.code === 'Space' || e.code === 'Enter')) return;
+    if (e.code === 'KeyM') { toggleMute(); return; }
+    const k = KEYMAP[e.code];
+    if (k || e.code === 'Enter') e.preventDefault();
+    if (e.repeat) { if (k) keys[k] = true; return; }
+    if (state === 'title' || state === 'results') {
+      if (e.code === 'Space' || e.code === 'Enter') startCountdown();
+      return;
+    }
+    if (k) keys[k] = true;
+    if (k === 'thrust' || e.code === 'Enter') pressGo();
+  });
+  window.addEventListener('keyup', (e) => {
+    const k = KEYMAP[e.code];
+    if (k) keys[k] = false;
+  });
+  window.addEventListener('blur', () => { keys.left = keys.right = keys.thrust = false; syncTouchButtons(); });
+
+  cvs.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'touch' && !isTouch) { isTouch = true; syncUI(); }
+    audio.init();
+    pressGo();
+  });
+
+  function holdButton(id, key) {
+    const el = $(id);
+    const on = (e) => {
+      e.preventDefault();
+      if (e.pointerType === 'touch') isTouch = true;
+      try { el.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+      keys[key] = true;
+      el.classList.add('on');
+      if (key === 'thrust') pressGo();
+    };
+    const off = () => { keys[key] = false; el.classList.remove('on'); };
+    el.addEventListener('pointerdown', on);
+    el.addEventListener('pointerup', off);
+    el.addEventListener('pointercancel', off);
+    el.addEventListener('lostpointercapture', off);
+    el.addEventListener('contextmenu', (e) => e.preventDefault());
+  }
+  holdButton('t-left', 'left');
+  holdButton('t-right', 'right');
+  holdButton('t-thrust', 'thrust');
+  function syncTouchButtons() {
+    $('t-left').classList.toggle('on', keys.left);
+    $('t-right').classList.toggle('on', keys.right);
+    $('t-thrust').classList.toggle('on', keys.thrust);
+  }
+
+  $('start').addEventListener('click', startCountdown);
+  $('again').addEventListener('click', startCountdown);
+  coarse.addEventListener?.('change', () => { isTouch = coarse.matches || isTouch; syncUI(); });
+
+  function toggleMute() {
+    audio.setMuted(!audio.muted);
+    try { localStorage.setItem('roadster-flip-muted', audio.muted ? '1' : '0'); } catch (e) { /* storage blocked */ }
+    renderMute();
+  }
+  function renderMute() {
+    $('mute').setAttribute('aria-pressed', String(audio.muted));
+    $('mute').setAttribute('aria-label', audio.muted ? 'Unmute sound' : 'Mute sound');
+    $('mute-waves').toggleAttribute('hidden', audio.muted);
+    $('mute-x').toggleAttribute('hidden', !audio.muted);
+  }
+  $('mute').addEventListener('click', () => { audio.init(); toggleMute(); });
+
+  // ------------------------------------------------------------------ loop
+  let last = performance.now(), accum = 0;
+  function frame(now) {
+    let dt = (now - last) / 1000;
+    last = now;
+    if (dt > 0.1) dt = 0.1;
+    accum += dt;
+    while (accum >= STEP) { step(STEP); accum -= STEP; }
+    gDisp += (gNow - gDisp) * Math.min(1, dt * 8);
+    updateCamera(dt);
+    shX = cam.shake ? rnd(-1, 1) * cam.shake * 9 : 0;
+    shY = cam.shake ? rnd(-1, 1) * cam.shake * 9 : 0;
+    const speed = Math.hypot(car.vx, car.vy);
+    audio.update({
+      speed,
+      motor: state === 'run' || state === 'ramp' ? 1 : state === 'countdown' ? 0.25 : state === 'landed' ? 0.3 : 0,
+      thrust: car.thrusting && state === 'air' ? 1 : 0,
+      wind: state === 'air' ? clamp(speed / 35, 0.15, 1) : 0,
+    });
+
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, cvs.width, cvs.height);
+    drawBackground();
+    drawWorld();
+    drawRings();
+    drawShadow();
+    drawCar();
+    drawParticles();
+    drawHUD(dt);
+    requestAnimationFrame(frame);
+  }
+
+  function boot(data) {
+    if (data && typeof data.best === 'number') best = Math.max(best, data.best);
+    renderMute();
+    syncUI();
+    try { document.fonts?.load('600 20px Saira'); document.fonts?.load('12px Michroma'); } catch (e) { /* fonts optional */ }
+    requestAnimationFrame((t) => { last = t; frame(t); });
+  }
+  try { window.claude?.hot?.snapshot?.(() => ({ best })); } catch (e) { /* not in a viewer */ }
+  const hot = window.claude?.hot;
+  if (hot?.ready) hot.ready(boot); else boot(hot?.data ?? {});
+})();
+</script>
+</body>
+</html>
